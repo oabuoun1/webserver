@@ -23,19 +23,33 @@ class HTTP(BaseHTTPRequestHandler):
             data = ""
 
         if (self.path == '/task/get'):
-            print("This is a task")
-            task = params.task_manager.get_undispatched_task("instance")
+            print("******************************************")
+            print("A replica is asking for a job:" + str(data) )
+            print("******************************************")
+            task = params.task_manager.get_undispatched_task(data)
             if (task != None):
                 f = open(task["json"], 'r')
                 json_data = f.read()
                 response = {"task_id": task['id'],"data": json_data }
-                print("**********************************")
-                print(response)
-                print("**********************************")
+                #print("**********************************")
+                #print(response)
+                #print("**********************************")
                 binary = bytes(json.dumps(response), "utf-8")
             else :
                 response = "shutdown_now"
                 binary = bytes(response,"utf-8")
+        elif (self.path == '/replica/register'):
+            print("A new replica has just joined the infra")
+            #pprint(vars(self))
+            #pprint(vars(params.replica_manager))
+            method = getattr(params.replica_manager, 'register')
+
+            replica_id = method(self.client_address) 
+            print("replica_id : " + str(replica_id))
+            response = {"replica_id": str(replica_id) }
+            #print(response)
+            binary = bytes(json.dumps(response),"utf-8")
+            #print("")
         else:
             print("unrecognized oprtation")
 
@@ -46,23 +60,29 @@ class HTTP(BaseHTTPRequestHandler):
         self._set_headers()
         
     def do_POST(self):
-        pprint(vars(self))
+        #pprint(vars(self))
         # Doesn't do anything with posted data
         content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
-        data = urllib.parse.parse_qs(self.rfile.read(content_length).decode('utf-8'))
+        packet = urllib.parse.parse_qs(self.rfile.read(content_length).decode('utf-8'))
+        data_back = ""
+        #print("packet : " + str(packet) )
         #post_data = self.rfile.read(content_length) # <--- Gets the data itself
 
         if (self.path == '/task/result'):
-            print(data)
-            print("-----------------------------------------")
-            params.task_manager.save_result(data['task_id'][0], data['instance_id'][0], data['data_id'][0],data['data'][0])
+            print(packet)
+            print("Result -----------------------------------------")
+            data_back = params.task_manager.save_result(packet['replica_id'][0],packet['data'][0])
         elif (self.path == '/task/finished'):
-            print(data)
-            print("-----------------------------------------")
-            params.task_manager.task_finished(data['task_id'][0], data['instance_id'][0], data['data'][0])
+            #print(packet)
+            print("Finished -----------------------------------------")
+            data_back = params.task_manager.task_finished(packet['replica_id'][0],packet['data'][0])
+        elif (self.path == '/replica/still_alive'):
+            #print(packet)
+            print("Still_alive -----------------------------------------")
+            data_back = params.replica_manager.still_alive(packet['replica_id'][0],packet['data'][0])
         
         self._set_headers()
-        self.wfile.write(bytes("received successfully", "utf-8"))
+        self.wfile.write(bytes(str(data_back), "utf-8"))
         '''
         self._set_headers()
         t = "<html><body><h1>" + str(data)  + "</h1></body></html>"

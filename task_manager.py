@@ -1,4 +1,4 @@
-import math, time, datetime, random, shutil, json
+import math, time, datetime, random, shutil, json, ast
 from pathlib import Path
 
 class Task_Manager:
@@ -13,7 +13,7 @@ class Task_Manager:
             self.process_tasks(tasks)
         '''
         print("********************************************")
-        #print(self.get_undispatched_task("instance2"))
+        #print(self.get_undispatched_task("replica2"))
         print("---------------------------------------------")
         print(self.get_undispatched_tasks())
         print("---------------------------------------------")
@@ -26,7 +26,7 @@ class Task_Manager:
         print(self.get_done_count())
         print("********************************************")
         
-        #print(self.get_undispatched_task("instance1"))
+        #print(self.get_undispatched_task("replica1"))
         print("---------------------------------------------")
         print(self.get_undispatched_tasks())
         print("---------------------------------------------")
@@ -43,6 +43,7 @@ class Task_Manager:
         text = "UTC :" + str(self.get_undispatched_count()) + " | "
         text += "DTC :" + str(self.get_dispatched_count()) + " | "
         text += "FTC :" + str(self.get_finished_count()) + " | "
+        #text += str(self.TASKS)
         return text
 
     def init_directory(self, dir = "./jobs"):
@@ -71,9 +72,10 @@ class Task_Manager:
                     print("File_name : " + file_name)
                     task = {'id': file_name, \
                         'status': 'undispatched', \
-                        'instance': None, \
+                        'replica_id': None, \
                         'dispached_at':None, \
                         'finished_at':None, \
+                        'results': [], \
                     }
                     shutil.copy(str(x),str(self.INPUT_DIR))
                     task['json'] = str(self.INPUT_DIR) + "/" + file_name + ".json"
@@ -92,11 +94,12 @@ class Task_Manager:
         for x in range(0,task_count):
             task = {"task_" + str(x) : { \
                 'status': 'undispatched', \
-                'instance': None, \
+                'replica_id': None, \
                 'dispached_at':None, \
                 'finished_at':None, \
                 'json': None, \
                 'data': None, \
+                'results': [], \
             }}
             self.TASKS.append(task)
         print(self.TASKS)
@@ -114,13 +117,16 @@ class Task_Manager:
                 return self.TASKS[i]
         return None
     
-    def get_undispatched_task(self, instance):
+    def get_undispatched_task(self, data):
         task = self.findFirst("status", "undispatched")
         if (task != None):
             task["status"] = "dispatched"
-            task["instance"] = instance
+            task["replica_id"] = data['replica_id']
             task["dispached_at"] = time.time()
         return task
+
+    def get_task_count(self):
+        return len(self.TASKS)
 
     def get_undispatched_tasks(self):
         return self.findAll("status", "undispatched")
@@ -140,25 +146,26 @@ class Task_Manager:
     def get_finished_count(self):
         return self.count("status", "finished")
 
-    def save_result(self,task_id, instance_id, result_id, result):
-        file_name = str(self.OUTPUT_DIR) + "/" + result_id 
-        try:
-            json_object = json.loads(result)
-            file_name += ".json"
+    def save_result(self,replica_id, data):
+        #print("data : " + str(type(data)) + " - " + data)
+        #json_object = json.loads(data["result"])
+        data_as_json = ast.literal_eval(data)
+        result_id = data_as_json["result_id"]
+        task_id   = data_as_json["task_id"]
+        file_name = str(self.OUTPUT_DIR) + "/" + task_id + "_" + result_id  
+        file_name += ".json"
 
-        except ValueError:
-            file_name += ".result"
- 
         file = open(file_name, 'a')
-        file.write(result)
+        file.write(str(data_as_json["result"]))
         file.close()
+        task = self.findFirst("id", task_id)
+        task['results'].append(file_name)
 
-    def task_finished(self,task_id, instance_id, finished_at):
-        print("666666666666666666666666666666666666")
-        print(task_id)
-        print("666666666666666666666666666666666666")
-        task = self.findFirst("id",task_id)
-        print(task)
+    def task_finished(self,replica_id, data):
+        #print("data : " + str(type(data)) + " - " + data)
+        data_as_json = ast.literal_eval(data)
+        task = self.findFirst("id",data_as_json["task_id"])
+        #print(task)
         task["status"] = "finished"
-        task['finished_at'] = finished_at
+        task['finished_at'] = data_as_json["finished_at"]
         return 

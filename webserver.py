@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 
-import argparse, time
+import argparse, time, sys
 from pprint import pprint
 from threading import Thread
 from pathlib import Path
 import env_params, dispatcher 
 
-params = env_params.Params()
+params = None
 
 def scaleUp():
     print("Scaling Up")
-    print("Start instance")
+    print("Start replica")
+    params.replica_manager.add_replica()
     #print("Dispatch Task")
     '''
-    task = params.task_manager.get_undispatched_task("instance3")
+    task = params.task_manager.get_undispatched_task("replica3")
     print("////////////////////////////////////////////")
     print(task)
     print("////////////////////////////////////////////")
@@ -24,7 +25,7 @@ def scaleUp():
     print(params.task_manager.TASKS)
     print("////////////////////////////////////////////")
     '''
-    #print(params.task_manager.get_undispatched_task("instance"))
+    #print(params.task_manager.get_undispatched_task("replica"))
     return 
 
 def scaler():
@@ -33,47 +34,51 @@ def scaler():
         print(params)
         if (params.task_manager.get_undispatched_count() > 0):
             print("TC > 0")
-            if (params.INSTANCE_COUNT_GET() < params.SIMULTANEOUS_INSTANCES_NEEDED_GET()):
-                print("IC < SIN")
+            if (params.replica_manager.replica_count() < params.SIMULTANEOUS_REPLICAS_NEEDED_GET()):
+                print("RC < SRN")
                 # Scaleup
-                scaleUp()
-                # IC++
-                params.INSTANCE_COUNT_INCREASE()
+                print("Add replica")
+                params.replica_manager.add_replicas(1)
+                # RC++
+                # params.REPLICA_COUNT_INCREASE()
+                # Start a replica
                 # TC--
-                continue
+                pass
             else:
-                print("IC >= SIN")
-                if (params.SIMULTANEOUS_INSTANCES_NEEDED_GET() > params.task_manager.get_dispatched_count()):
+                print("RC >= SRN")
+                if (params.SIMULTANEOUS_REPLICAS_NEEDED_GET() > params.task_manager.get_dispatched_count()):
                     pass
                 else:                    
                     if((params.task_manager.get_undispatched_count() * params.TASK_DURATION_GET()) > params.REMAINING_TIME()):
                         print("TC*TD > RT")
-                        if (params.SIMULTANEOUS_INSTANCES_NEEDED_GET() < params.MAX_INSTANCES_ALLOWED_GET()):
-                            print("SIN < MAX")
-                            params.SIMULTANEOUS_INSTANCES_NEEDED_INCREASE()
+                        if (params.SIMULTANEOUS_REPLICAS_NEEDED_GET() < params.MAX_REPLICAS_ALLOWED_GET()):
+                            print("SRN < MAX")
+                            params.SIMULTANEOUS_REPLICAS_NEEDED_INCREASE()
                             continue
                         else:
-                            print("SIN >= MAX")
+                            print("SRN >= MAX")
                             pass
                     else:
                         print("TC*TD <= RT")
-                        if (params.SIMULTANEOUS_INSTANCES_NEEDED_GET() >= params.MAX_INSTANCES_ALLOWED_GET()):
-                            print("SIN >= MAX")
-                            params.SIMULTANEOUS_INSTANCES_NEEDED_DECREASE()
+                        if (params.SIMULTANEOUS_REPLICAS_NEEDED_GET() >= params.MAX_REPLICAS_ALLOWED_GET()):
+                            print("SRN >= MAX")
+                            params.SIMULTANEOUS_REPLICAS_NEEDED_DECREASE()
                         else:
                             pass
         else:
-            print("TC <= 0")
-            if (params.INSTANCE_COUNT_GET() <= 0):
-                print("IC <= 0")
+            print("UTC <= 0")
+            if (params.task_manager.get_finished_count() == params.task_manager.get_task_count()):
+                print("TC == FTC")
                 break 
             else:
-                print("IC > 0")
+                print("TC != FTC")
                 pass
         print(params)
         time.sleep(3)
 
-    print("Loop is Over")
+    print("Job Accomplished")
+    params.replica_manager.stop_service()
+    sys.exit()
 
 def check_positive(value):
     ivalue = int(value)
@@ -89,11 +94,13 @@ def check_directory(ivalue):
 
 def getArgs():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--min"   , help="Min Allowed Instances, default = 1" , type=check_positive)
-    parser.add_argument("--max"   , help="Max Allowed Instances, default = 10", type=check_positive)
+    parser.add_argument("--server", help="HTTP Server Address (Accessible from all VMs)", required=True)
+    parser.add_argument("--port"  , help="HTTP Server port, default = 8777", type=check_positive)
+    parser.add_argument("--image" , help="Client Docker Image ", required=True)
+    parser.add_argument("--min"   , help="Min Allowed Replicas, default = 1" , type=check_positive)
+    parser.add_argument("--max"   , help="Max Allowed Replicas, default = 10", type=check_positive)
     parser.add_argument("--td"    , help="Single Task Duration (in seconds)", type=check_positive, required=True)
     parser.add_argument("--jdl"   , help="Job (all tasks) deadline (in seconds)", type=check_positive, required=True)
-    parser.add_argument("--port"  , help="HTTP Server port, default = 8777", type=check_positive)
     parser.add_argument("--dir"   , help="Jobs directory, default = ./jobs")
     #parser.add_argument("--task"  , help="Task .json file")
     #parser.add_argument("--etask" , help="Extended Task JSON File and files directory, --etask x.json x_files")
@@ -105,7 +112,7 @@ if __name__ == "__main__":
     #from sys import argv
     args = getArgs()
     print(args)
-    params.update(args)
+    params = env_params.Params(args)
     scaler_thread = Thread(target = scaler)
     scaler_thread.start()
     dispatcher_thread = Thread(target = dispatcher.start, args = (params, args.port,))
