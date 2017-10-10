@@ -1,8 +1,16 @@
 import math, time, datetime, random, shutil, json, ast
 from pathlib import Path
+from threading import Lock
 
 class Task_Manager:
-    def __init__(self, tasks, task_count=0):
+    lock = Lock()
+
+    def __init__(self, task_duration, tasks, task_count=0):
+        self.TASK_DURATION = task_duration
+        self.MIN_REAL_TASK_DURATION = 0
+        self.MAX_REAL_TASK_DURATION = 0
+        self.AVG_REAL_TASK_DURATION = 0
+
         self.TASKS = []
         print(tasks)
         print(task_count)
@@ -116,7 +124,23 @@ class Task_Manager:
             if dic[key] == value:
                 return self.TASKS[i]
         return None
-    
+    def get_delayed_dispatched_task(self, data):
+        self.lock.acquire()
+        try:        
+            tasks = self.findAll("status", "dispatched")
+            task_to_return = None
+            for task in tasks:
+                elapsed_time = time.time() - task["dispached_at"]
+                if (elapsed_time > self.MAX_REAL_TASK_DURATION):
+                    task["status"] = "dispatched"
+                    task["replica_id"] = data['replica_id']
+                    task["dispached_at"] = time.time()
+                    task_to_return = task
+                    break
+        finally:
+            self.lock.release() #release lock
+        return task_to_return
+
     def get_undispatched_task(self, data):
         task = self.findFirst("status", "undispatched")
         if (task != None):
@@ -152,7 +176,7 @@ class Task_Manager:
         data_as_json = ast.literal_eval(data)
         result_id = data_as_json["result_id"]
         task_id   = data_as_json["task_id"]
-        file_name = str(self.OUTPUT_DIR) + "/" + task_id + "_" + result_id  
+        file_name = str(self.OUTPUT_DIR) + "/" + task_id + "_" + replica_id + "_" + result_id  
         file_name += ".json"
 
         file = open(file_name, 'a')
@@ -168,4 +192,11 @@ class Task_Manager:
         #print(task)
         task["status"] = "finished"
         task['finished_at'] = data_as_json["finished_at"]
+        self.update_durations(task['finished_at'] - task['dispached_at'])
         return 
+
+    def update_durations(self, duration):
+        if (self.MIN_REAL_TASK_DURATION > duration):
+            self.MIN_REAL_TASK_DURATION = duration
+        if (self.MAX_REAL_TASK_DURATION < duration):
+            self.MAX_REAL_TASK_DURATION = duration

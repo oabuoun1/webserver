@@ -2,7 +2,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import urllib.parse, json
 from pprint import pprint
 
-params = None
+task_manager = None
+replica_manager = None
 
 class HTTP(BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -10,9 +11,33 @@ class HTTP(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
+    def check_tasks(self, request_data):
+        task = task_manager.get_undispatched_task(request_data)
+        if (task != None):
+            f = open(task["json"], 'r')
+            json_data = f.read()
+            response = {"task_id": task['id'],"data": json_data }
+            #print("**********************************")
+            #print(response)
+            #print("**********************************")
+            binary = bytes(json.dumps(response), "utf-8")
+        else :
+            task = task_manager.get_delayed_dispatched_task(request_data)
+            if (task != None):
+                f = open(task["json"], 'r')
+                json_data = f.read()
+                response = {"task_id": task['id'],"data": json_data }
+                print("**********************************")
+                print(response)
+                print("**********************************")
+                binary = bytes(json.dumps(response), "utf-8")
+            else:
+                response = "shutdown_now"
+                binary = bytes(response,"utf-8")
+        return binary
+
     def do_GET(self):
-        global params
-        #pprint(vars(self))
+        global task_manager, replica_manager
         data = None
         binary = None
 
@@ -26,23 +51,10 @@ class HTTP(BaseHTTPRequestHandler):
             print("******************************************")
             print("A replica is asking for a job:" + str(data) )
             print("******************************************")
-            task = params.task_manager.get_undispatched_task(data)
-            if (task != None):
-                f = open(task["json"], 'r')
-                json_data = f.read()
-                response = {"task_id": task['id'],"data": json_data }
-                #print("**********************************")
-                #print(response)
-                #print("**********************************")
-                binary = bytes(json.dumps(response), "utf-8")
-            else :
-                response = "shutdown_now"
-                binary = bytes(response,"utf-8")
+            binary = self.check_tasks(data)
         elif (self.path == '/replica/register'):
             print("A new replica has just joined the infra")
-            #pprint(vars(self))
-            #pprint(vars(params.replica_manager))
-            method = getattr(params.replica_manager, 'register')
+            method = getattr(replica_manager, 'register')
 
             replica_id = method(self.client_address) 
             print("replica_id : " + str(replica_id))
@@ -71,15 +83,15 @@ class HTTP(BaseHTTPRequestHandler):
         if (self.path == '/task/result'):
             print(packet)
             print("Result -----------------------------------------")
-            data_back = params.task_manager.save_result(packet['replica_id'][0],packet['data'][0])
+            data_back = task_manager.save_result(packet['replica_id'][0],packet['data'][0])
         elif (self.path == '/task/finished'):
             #print(packet)
             print("Finished -----------------------------------------")
-            data_back = params.task_manager.task_finished(packet['replica_id'][0],packet['data'][0])
+            data_back = task_manager.task_finished(packet['replica_id'][0],packet['data'][0])
         elif (self.path == '/replica/still_alive'):
             #print(packet)
             print("Still_alive -----------------------------------------")
-            data_back = params.replica_manager.still_alive(packet['replica_id'][0],packet['data'][0])
+            data_back = replica_manager.still_alive(packet['replica_id'][0],packet['data'][0])
         
         self._set_headers()
         self.wfile.write(bytes(str(data_back), "utf-8"))
@@ -98,10 +110,11 @@ class HTTP(BaseHTTPRequestHandler):
         f.close()
         '''
 
-def start(env_params, port=8777):
-    global params
-    params = env_params
-    #pprint(vars(params))
+def start(task_manager1, replica_manager1, port=8777):
+    global task_manager, replica_manager
+    task_manager = task_manager1
+    replica_manager = replica_manager1
+
     server_address = ('', port)
     httpd = HTTPServer(server_address, HTTP)
     print('Starting httpd...' + str(port))

@@ -2,6 +2,7 @@ import math, time, datetime, random, shutil, threading, subprocess, docker
 from threading import Lock
 from docker import types
 from pprint import pprint
+from pathlib import Path
 
 class Replica_Manager:
     SERVICE_NAME = ""
@@ -10,20 +11,69 @@ class Replica_Manager:
     replicas = {}
     index = 0
 
-    def __init__(self, image, server, port, SRN):
-        print("--------------------------------------------------------------")
-        print("Starting the service ")
-        self.IMAGE = image
-        self.SERVER = server
-        self.PORT = port
-        for ch in image:
+    def __init__(self, args, task_manager):
+        self.task_manager = task_manager
+        self.IMAGE = args.image
+        self.SERVER = args.server
+        self.PORT = args.port
+        self.JOB_DEADLINE = 0
+        self.TASK_DURATION = 0
+        self.MIN_REPLICAS_ALLOWED = 1
+        self.MAX_REPLICAS_ALLOWED = 10
+        self.SIMULTANEOUS_REPLICAS_NEEDED = 0
+        self.TASK_DURATION = args.td
+        self.JOB_DEADLINE_SET(args.jdl)
+        try:
+            self.MIN_REPLICAS_ALLOWED = args.min
+        except:
+            pass
+        try:
+            self.MAX_REPLICAS_ALLOWED = args.max
+        except:
+            pass
+        self.STARTING_TIME = self.TIME_NOW_GET()
+
+        for ch in self.IMAGE:
             self.SERVICE_NAME += "_" if ch == "/" else ch
         self.SERVICE_NAME += "_"
         self.SERVICE_NAME += str(random.randrange(1000,9999))
-        self.start_service(SRN)
+        self.start_service(self.SIMULTANEOUS_REPLICAS_NEEDED)
         #subprocess.run(["docker", "service", "create" , "--name", self.SERVICE_NAME, image, "--server", server, "--port", str(port)], stdout=subprocess.PIPE)
 
+    def JOB_DEADLINE_SET(self, jdl):
+        assert isinstance(jdl, int)
+        self.JOB_DEADLINE = jdl
+        self.SIMULTANEOUS_REPLICAS_NEEDED = math.ceil(self.task_manager.get_task_count() * self.TASK_DURATION / self.JOB_DEADLINE)
+        if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.MAX_REPLICAS_ALLOWED):
+            self.SIMULTANEOUS_REPLICAS_NEEDED = self.MAX_REPLICAS_ALLOWED
+
+    def TIME_NOW_GET(self):
+        return round(time.time())
+
+    def STARTING_TIME_GET(self):
+        return self.STARTING_TIME
+
+    def SIMULTANEOUS_REPLICAS_NEEDED_INCREASE(self, count = 1):
+        if ((self.SIMULTANEOUS_REPLICAS_NEEDED + count) <= self.MAX_REPLICAS_ALLOWED):
+            self.SIMULTANEOUS_REPLICAS_NEEDED += count
+        else:
+            self.SIMULTANEOUS_REPLICAS_NEEDED = self.MAX_REPLICAS_ALLOWED
+
+    def SIMULTANEOUS_REPLICAS_NEEDED_DECREASE(self, count = 1):
+        if ((self.SIMULTANEOUS_REPLICAS_NEEDED - count) > self.MIN_REPLICAS_ALLOWED):
+            self.SIMULTANEOUS_REPLICAS_NEEDED -= count
+        else:
+            self.SIMULTANEOUS_REPLICAS_NEEDED = self.MIN_REPLICAS_ALLOWED
+
+    def ELAPSED_TIME(self):
+        return self.TIME_NOW_GET() - self.STARTING_TIME_GET()
+
+    def REMAINING_TIME(self):
+        return self.JOB_DEADLINE - self.ELAPSED_TIME()
+
     def start_service(self, SRN):
+        print("--------------------------------------------------------------")
+        print("Starting the service ")
         self.docker_client = docker.from_env()
         env = ["SERVER=" + self.SERVER, "PORT=" + str(self.PORT)]
         mode = types.ServiceMode(mode='replicated', replicas= SRN)
@@ -33,7 +83,14 @@ class Replica_Manager:
         self.SERVICE.remove()
 
     def __str__(self):
-        text = ""
+        text  = "JDL:" + str(self.JOB_DEADLINE) + " | "
+        text += "TD :" + str(self.TASK_DURATION) + " | "
+        text += "JDL " + str(self.JOB_DEADLINE) + " | "
+        text += "SRN " + str(self.SIMULTANEOUS_REPLICAS_NEEDED) + " | "
+        text += "MIN " + str(self.MIN_REPLICAS_ALLOWED) + " | "
+        text += "MAX " + str(self.MAX_REPLICAS_ALLOWED) + " | "
+        text += "ST  " + str(self.STARTING_TIME_GET()) + " | "
+        text += "RT  " + str(self.REMAINING_TIME()) + " | "
         return text
 
     def register(self, client_address):
@@ -87,3 +144,48 @@ class Replica_Manager:
         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
         subprocess.run(["docker", "service", "scale" , self.SERVICE_NAME + "=" + str(self.replica_count() + count)], stdout=subprocess.PIPE)
 
+    def start(self):
+        while True:
+            if (self.task_manager.get_undispatched_count() > 0):
+                print("TC > 0")
+                if (self.replica_count() < self.SIMULTANEOUS_REPLICAS_NEEDED):
+                    print("RC < SRN")
+                    print("Adding a replica")
+                    self.add_replicas(1)
+                    # RC++
+                    pass
+                else:
+                    print("RC >= SRN")
+                    if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.task_manager.get_dispatched_count()):
+                        pass
+                    else:                    
+                        if((self.task_manager.get_undispatched_count() * self.TASK_DURATION) > self.REMAINING_TIME()):
+                            print("TC*TD > RT")
+                            if (self.SIMULTANEOUS_REPLICAS_NEEDED < self.MAX_REPLICAS_ALLOWED):
+                                print("SRN < MAX")
+                                self.SIMULTANEOUS_REPLICAS_NEEDED_INCREASE()
+                                continue
+                            else:
+                                print("SRN >= MAX")
+                                pass
+                        else:
+                            print("TC*TD <= RT")
+                            if (self.SIMULTANEOUS_REPLICAS_NEEDED >= self.MAX_REPLICAS_ALLOWED):
+                                print("SRN >= MAX")
+                                self.SIMULTANEOUS_REPLICAS_NEEDED_DECREASE()
+                            else:
+                                pass
+            else:
+                print("UTC <= 0")
+                if (self.task_manager.get_finished_count() == self.task_manager.get_task_count()):
+                    print("TC == FTC")
+                    break 
+                else:
+                    print("TC != FTC")
+                    pass
+            print(self)
+            time.sleep(3)
+
+        print("Job Accomplished")
+        self.stop_service()
+        sys.exit()
