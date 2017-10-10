@@ -1,4 +1,4 @@
-import math, time, datetime, random, shutil, threading, subprocess, docker
+import math, time, datetime, random, shutil, threading, subprocess, docker, sys
 from threading import Lock
 from docker import types
 from pprint import pprint
@@ -44,6 +44,8 @@ class Replica_Manager:
         assert isinstance(jdl, int)
         self.JOB_DEADLINE = jdl
         self.SIMULTANEOUS_REPLICAS_NEEDED = math.ceil(self.task_manager.get_task_count() * self.TASK_DURATION / self.JOB_DEADLINE)
+        if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.MIN_REPLICAS_ALLOWED):
+            self.SIMULTANEOUS_REPLICAS_NEEDED = self.MIN_REPLICAS_ALLOWED
         if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.MAX_REPLICAS_ALLOWED):
             self.SIMULTANEOUS_REPLICAS_NEEDED = self.MAX_REPLICAS_ALLOWED
 

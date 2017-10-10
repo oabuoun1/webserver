@@ -81,8 +81,8 @@ class HTTP(BaseHTTPRequestHandler):
         #post_data = self.rfile.read(content_length) # <--- Gets the data itself
 
         if (self.path == '/task/result'):
-            print(packet)
-            print("Result -----------------------------------------")
+            #print(packet)
+            #print("Result -----------------------------------------")
             data_back = task_manager.save_result(packet['replica_id'][0],packet['data'][0])
         elif (self.path == '/task/finished'):
             #print(packet)

@@ -3,7 +3,8 @@ from pathlib import Path
 from threading import Lock
 
 class Task_Manager:
-    lock = Lock()
+    lock_dispatched_tasks = Lock()
+    lock_undispatched_tasks = Lock()
 
     def __init__(self, task_duration, tasks, task_count=0):
         self.TASK_DURATION = task_duration
@@ -125,10 +126,10 @@ class Task_Manager:
                 return self.TASKS[i]
         return None
     def get_delayed_dispatched_task(self, data):
-        self.lock.acquire()
+        self.lock_dispatched_tasks.acquire()
+        task_to_return = None
         try:        
             tasks = self.findAll("status", "dispatched")
-            task_to_return = None
             for task in tasks:
                 elapsed_time = time.time() - task["dispached_at"]
                 if (elapsed_time > self.MAX_REAL_TASK_DURATION):
@@ -138,16 +139,22 @@ class Task_Manager:
                     task_to_return = task
                     break
         finally:
-            self.lock.release() #release lock
+            self.lock_dispatched_tasks.release() #release lock
         return task_to_return
 
     def get_undispatched_task(self, data):
-        task = self.findFirst("status", "undispatched")
-        if (task != None):
-            task["status"] = "dispatched"
-            task["replica_id"] = data['replica_id']
-            task["dispached_at"] = time.time()
-        return task
+        self.lock_undispatched_tasks.acquire()
+        task_to_return = None
+        try:
+            task = self.findFirst("status", "undispatched")
+            if (task != None):
+                task["status"] = "dispatched"
+                task["replica_id"] = data['replica_id']
+                task["dispached_at"] = time.time()
+                task_to_return = task
+        finally:
+            self.lock_undispatched_tasks.release() #release lock
+        return task_to_return
 
     def get_task_count(self):
         return len(self.TASKS)
@@ -192,7 +199,7 @@ class Task_Manager:
         #print(task)
         task["status"] = "finished"
         task['finished_at'] = data_as_json["finished_at"]
-        self.update_durations(task['finished_at'] - task['dispached_at'])
+        self.update_durations(float(task['finished_at']) - task['dispached_at'])
         return 
 
     def update_durations(self, duration):
