@@ -8,27 +8,7 @@ import env_params, dispatcher
 
 params = None
 
-def scaleUp():
-    print("Scaling Up")
-    print("Start replica")
-    params.replica_manager.add_replica()
-    #print("Dispatch Task")
-    '''
-    task = params.task_manager.get_undispatched_task("replica3")
-    print("////////////////////////////////////////////")
-    print(task)
-    print("////////////////////////////////////////////")
-    print(params.task_manager.get_undispatched_tasks())
-    print("////////////////////////////////////////////")
-    task["status"] = "done"
-    print("////////////////////////////////////////////")
-    print(params.task_manager.TASKS)
-    print("////////////////////////////////////////////")
-    '''
-    #print(params.task_manager.get_undispatched_task("replica"))
-    return 
-
-def scaler():
+def replica_controller():
     params.STARTING_TIME_SET()
     while True:
         print(params)
@@ -36,13 +16,9 @@ def scaler():
             print("TC > 0")
             if (params.replica_manager.replica_count() < params.SIMULTANEOUS_REPLICAS_NEEDED_GET()):
                 print("RC < SRN")
-                # Scaleup
-                print("Add replica")
+                print("Adding a replica")
                 params.replica_manager.add_replicas(1)
                 # RC++
-                # params.REPLICA_COUNT_INCREASE()
-                # Start a replica
-                # TC--
                 pass
             else:
                 print("RC >= SRN")
@@ -109,11 +85,10 @@ def getArgs():
     return parser.parse_args()
 
 if __name__ == "__main__":
-    #from sys import argv
     args = getArgs()
     print(args)
     params = env_params.Params(args)
-    scaler_thread = Thread(target = scaler)
-    scaler_thread.start()
+    replica_controller_thread = Thread(target = replica_controller)
+    replica_controller_thread.start()
     dispatcher_thread = Thread(target = dispatcher.start, args = (params, args.port,))
     dispatcher_thread.start()
