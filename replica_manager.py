@@ -27,7 +27,7 @@ class Replica_Manager:
         self.docker_client = docker.from_env()
         env = ["SERVER=" + self.SERVER, "PORT=" + str(self.PORT)]
         mode = types.ServiceMode(mode='replicated', replicas= SRN)
-        self.SERVICE = self.docker_client.services.create("python-webclient", command=None, env= env, mode= mode, name=self.SERVICE_NAME)
+        self.SERVICE = self.docker_client.services.create(self.IMAGE, command=None, env= env, mode= mode, name=self.SERVICE_NAME)
 
     def stop_service(self):
         self.SERVICE.remove()
