@@ -49,9 +49,16 @@ class Task_Manager:
         #self.TASK_COUNT_SET(args.tc)
         '''
     def __str__(self):
-        text = "UTC :" + str(self.get_undispatched_count()) + " | "
+        text = "\n"
+        text += "UTC :" + str(self.get_undispatched_count()) + " | "
+        tasks = [task['id'] for task in self.get_undispatched_tasks()]
+        text += "Undispatched : " + str(tasks) + "\n"
         text += "DTC :" + str(self.get_dispatched_count()) + " | "
+        tasks = [task['id'] for task in self.get_dispatched_tasks()]
+        text += "Dispatched : " + str(tasks) + "\n"       
         text += "FTC :" + str(self.get_finished_count()) + " | "
+        tasks = [task['id'] for task in self.get_finished_tasks()]
+        text += "Finished : " + str(tasks) + "\n"
         #text += str(self.TASKS)
         return text
 

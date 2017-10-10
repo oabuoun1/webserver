@@ -21,11 +21,11 @@ class Replica_Manager:
         try:
             self.MIN_REPLICAS_ALLOWED = args.min
         except:
-            pass
+            self.MIN_REPLICAS_ALLOWED = 1
         try:
             self.MAX_REPLICAS_ALLOWED = args.max
         except:
-            pass
+            self.MAX_REPLICAS_ALLOWED = 10
         self.SIMULTANEOUS_REPLICAS_NEEDED = 0
         self.JOB_DEADLINE_SET(args.jdl)
         self.STARTING_TIME = self.TIME_NOW_GET()
@@ -40,7 +40,8 @@ class Replica_Manager:
     def JOB_DEADLINE_SET(self, jdl):
         assert isinstance(jdl, int)
         self.JOB_DEADLINE = jdl
-        self.SIMULTANEOUS_REPLICAS_NEEDED = math.ceil(self.task_manager.get_task_count() * self.TASK_DURATION / self.JOB_DEADLINE)
+        self.SIMULTANEOUS_REPLICAS_NEEDED = math.ceil((self.task_manager.get_task_count() * self.TASK_DURATION) / self.JOB_DEADLINE)
+        print(" /////////////// SRN = " + str(self.SIMULTANEOUS_REPLICAS_NEEDED) + " ////////////////////")
         if (self.SIMULTANEOUS_REPLICAS_NEEDED < self.MIN_REPLICAS_ALLOWED):
             self.SIMULTANEOUS_REPLICAS_NEEDED = self.MIN_REPLICAS_ALLOWED
         if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.MAX_REPLICAS_ALLOWED):
@@ -90,6 +91,7 @@ class Replica_Manager:
         text += "MAX " + str(self.MAX_REPLICAS_ALLOWED) + " | "
         text += "ST  " + str(self.STARTING_TIME_GET()) + " | "
         text += "RT  " + str(self.REMAINING_TIME()) + " | "
+        text += str(self.task_manager)
         return text
 
     def register(self, client_address):
