@@ -17,12 +17,7 @@ class Replica_Manager:
         self.SERVER = args.server
         self.PORT = args.port
         self.JOB_DEADLINE = 0
-        self.TASK_DURATION = 0
-        self.MIN_REPLICAS_ALLOWED = 1
-        self.MAX_REPLICAS_ALLOWED = 10
-        self.SIMULTANEOUS_REPLICAS_NEEDED = 0
         self.TASK_DURATION = args.td
-        self.JOB_DEADLINE_SET(args.jdl)
         try:
             self.MIN_REPLICAS_ALLOWED = args.min
         except:
@@ -31,6 +26,8 @@ class Replica_Manager:
             self.MAX_REPLICAS_ALLOWED = args.max
         except:
             pass
+        self.SIMULTANEOUS_REPLICAS_NEEDED = 0
+        self.JOB_DEADLINE_SET(args.jdl)
         self.STARTING_TIME = self.TIME_NOW_GET()
 
         for ch in self.IMAGE:
@@ -44,7 +41,7 @@ class Replica_Manager:
         assert isinstance(jdl, int)
         self.JOB_DEADLINE = jdl
         self.SIMULTANEOUS_REPLICAS_NEEDED = math.ceil(self.task_manager.get_task_count() * self.TASK_DURATION / self.JOB_DEADLINE)
-        if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.MIN_REPLICAS_ALLOWED):
+        if (self.SIMULTANEOUS_REPLICAS_NEEDED < self.MIN_REPLICAS_ALLOWED):
             self.SIMULTANEOUS_REPLICAS_NEEDED = self.MIN_REPLICAS_ALLOWED
         if (self.SIMULTANEOUS_REPLICAS_NEEDED > self.MAX_REPLICAS_ALLOWED):
             self.SIMULTANEOUS_REPLICAS_NEEDED = self.MAX_REPLICAS_ALLOWED
