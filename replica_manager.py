@@ -92,6 +92,7 @@ class Replica_Manager:
         text += "ST  " + str(self.STARTING_TIME_GET()) + " | "
         text += "RT  " + str(self.REMAINING_TIME()) + " | "
         text += str(self.task_manager)
+        text += "Replicas : " + str(self.replicas.keys()) 
         return text
 
     def register(self, client_address):
@@ -106,7 +107,7 @@ class Replica_Manager:
             self.replicas[replica_id] = replica
         finally:
             self.lock.release() #release lock
-        print(self.replicas)
+        #print(self.replicas)
         return replica_id
 
     def still_alive(self,replica_id, data):

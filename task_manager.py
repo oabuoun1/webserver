@@ -1,10 +1,10 @@
 import math, time, datetime, random, shutil, json, ast
 from pathlib import Path
-from threading import Lock
+#from threading import Lock
 
 class Task_Manager:
-    lock_dispatched_tasks = Lock()
-    lock_undispatched_tasks = Lock()
+    #lock_dispatched_tasks = Lock()
+    #lock_undispatched_tasks = Lock()
 
     def __init__(self, task_duration, tasks, task_count=0):
         self.TASK_DURATION = task_duration
@@ -133,7 +133,7 @@ class Task_Manager:
                 return self.TASKS[i]
         return None
     def get_delayed_dispatched_task(self, data):
-        self.lock_dispatched_tasks.acquire()
+        #self.lock_dispatched_tasks.acquire()
         task_to_return = None
         try:        
             tasks = self.findAll("status", "dispatched")
@@ -146,11 +146,12 @@ class Task_Manager:
                     task_to_return = task
                     break
         finally:
-            self.lock_dispatched_tasks.release() #release lock
+            #self.lock_dispatched_tasks.release() #release lock
+            pass
         return task_to_return
 
     def get_undispatched_task(self, data):
-        self.lock_undispatched_tasks.acquire()
+        #self.lock_undispatched_tasks.acquire()
         task_to_return = None
         try:
             task = self.findFirst("status", "undispatched")
@@ -160,7 +161,8 @@ class Task_Manager:
                 task["dispached_at"] = time.time()
                 task_to_return = task
         finally:
-            self.lock_undispatched_tasks.release() #release lock
+            #self.lock_undispatched_tasks.release() #release lock
+            pass
         return task_to_return
 
     def get_task_count(self):
