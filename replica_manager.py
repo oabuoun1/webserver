@@ -92,7 +92,7 @@ class Replica_Manager:
         text += "ST  " + str(self.STARTING_TIME_GET()) + " | "
         text += "RT  " + str(self.REMAINING_TIME()) + " | "
         text += str(self.task_manager)
-        text += "Replicas : " + str(self.replicas.keys()) 
+        text += "Replicas : " + str([{key, time.time() - self.replicas[key]["last_still_alive_at"]} for key in self.replicas.keys()]) 
         return text
 
     def register(self, client_address):

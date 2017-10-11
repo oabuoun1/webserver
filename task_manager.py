@@ -50,15 +50,19 @@ class Task_Manager:
         '''
     def __str__(self):
         text = "\n"
+        text += "================================================================" + "\n"
         text += "UTC :" + str(self.get_undispatched_count()) + " | "
-        tasks = [task['id'] for task in self.get_undispatched_tasks()]
+        tasks = [{task['id']} for task in self.get_undispatched_tasks()]
         text += "Undispatched : " + str(tasks) + "\n"
+        text += "---------------------------------------------------------" + "\n"
         text += "DTC :" + str(self.get_dispatched_count()) + " | "
-        tasks = [task['id'] for task in self.get_dispatched_tasks()]
+        tasks = [{task['id'],time.time() - task['dispached_at'], str(task['replica_id'])} for task in self.get_dispatched_tasks()]
         text += "Dispatched : " + str(tasks) + "\n"       
+        text += "---------------------------------------------------------" + "\n"
         text += "FTC :" + str(self.get_finished_count()) + " | "
-        tasks = [task['id'] for task in self.get_finished_tasks()]
+        tasks = [{task['id'],time.time() - task['finished_at']} for task in self.get_finished_tasks()]
         text += "Finished : " + str(tasks) + "\n"
+        text += "================================================================" + "\n"
         #text += str(self.TASKS)
         return text
 
